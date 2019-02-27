@@ -1,6 +1,5 @@
 --connection server_1
-
-call mtr.add_suppression("Dump thread [0-9]+ last sent to server [0-9]+ binlog file:pos .+");
+call mtr.add_suppression("Dump thread [0-9]+ last sent to server [0-9]+ binlog file:pos");
 CREATE TABLE t1 (a INT) ENGINE=innodb;
 
 --save_master_pos
@@ -41,7 +40,6 @@ SET @@GLOBAL.debug_dbug="+d,simulate_delay_at_shutdown";
 --write_file $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 wait
 EOF
-# --shutdown_server 60
 --send SHUTDOWN WAIT FOR SLAVES
 --reap
 --source include/wait_until_disconnected.inc

@@ -1542,17 +1542,8 @@ static bool is_dump_thread(THD *thd)
   return rc;
 }
 
-static my_bool kill_all_threads(THD *thd, void * )
+static my_bool kill_all_threads(THD* thd)
 {
-  DBUG_PRINT("quit", ("Informing thread %ld that it's time to die",
-                      (ulong) thd->thread_id));
-  /* We skip slave threads on this first loop through. */
-  if (thd->slave_thread)
-    return 0;
-  /* We skip master threads */
-  if (is_dump_thread(thd))
-    return 0;
-
   if (DBUG_EVALUATE_IF("only_kill_system_threads", !thd->system_thread, 0))
     return 0;
 
@@ -1583,19 +1574,33 @@ static my_bool kill_all_threads(THD *thd, void * )
   }
   mysql_mutex_unlock(&thd->LOCK_thd_kill);
   if (WSREP(thd)) mysql_mutex_unlock(&thd->LOCK_thd_data);
+
   return 0;
+}
+
+static my_bool kill_all_threads_but_repl(THD *thd, void * )
+{
+  DBUG_PRINT("quit", ("Informing thread %ld that it's time to die",
+                      (ulong) thd->thread_id));
+  /* We skip slave threads on this first loop through. */
+  if (thd->slave_thread)
+    return 0;
+  /* We skip master threads */
+  if (is_dump_thread(thd))
+    return 0;
+
+  return kill_all_threads(thd);
 }
 
 
 static my_bool warn_threads_still_active(THD *thd, void *)
 {
   /* We still skip dump threads */
-  if (is_dump_thread(thd))
-    return 0;
-  sql_print_warning("%s: Thread %llu (user : '%s') did not exit\n", my_progname,
-                    (ulonglong) thd->thread_id,
-                    (thd->main_security_ctx.user ?
-                     thd->main_security_ctx.user : ""));
+  if (!is_dump_thread(thd))
+    sql_print_warning("%s: Thread %llu (user : '%s') did not exit\n", my_progname,
+                      (ulonglong) thd->thread_id,
+                      (thd->main_security_ctx.user ?
+                       thd->main_security_ctx.user : ""));
   return 0;
 }
 
@@ -1603,26 +1608,7 @@ static my_bool kill_all_dump_threads(THD *thd, void *)
 {
   /* e.g "slow" shutdown leaves out dump threads */
 
-  if (!is_dump_thread(thd))
-    return 0;
-
-  if (thd->vio_ok())
-  {
-    if (global_system_variables.log_warnings)
-      sql_print_warning(ER_DEFAULT(ER_FORCING_CLOSE), my_progname,
-                        (ulong) thd->thread_id,
-                        (thd->main_security_ctx.user ?
-                         thd->main_security_ctx.user : ""));
-    /*
-      close_connection() might need a valid current_thd
-      for memory allocation tracking.
-    */
-    THD *save_thd= current_thd;
-    set_current_thd(thd);
-    close_connection(thd);
-    set_current_thd(save_thd);
-  }
-  return 0;
+  return is_dump_thread(thd) ? kill_all_threads(thd) : 0;
 }
 
 static my_bool dump_thread_report_status(THD *thd, void *)
@@ -1721,7 +1707,9 @@ void kill_mysql(THD *thd)
   if (DBUG_EVALUATE_IF("mysql_admin_slow_shutdown", 1,
                        thd->lex->is_slaves_wait_shutdown))
   {
+    // Flag the-wait-for-slaves shutdown mode
     mysql_bin_log.slaves_wait_shutdown= MYSQL_BIN_LOG::SHDN_PREPARE;
+
     debug_sync_set_action(thd,
                           STRING_WITH_LEN("now SIGNAL wait_for_done_waiting"));
     DBUG_EXECUTE_IF("simulate_delay_at_shutdown",
@@ -1733,8 +1721,8 @@ void kill_mysql(THD *thd)
                       DBUG_ASSERT(!debug_sync_set_action(thd,
                                                          STRING_WITH_LEN(act)));
                     };);
-    break_connect_loop();
   }
+  break_connect_loop();
 }
 
 
@@ -1754,7 +1742,7 @@ void end_dump_threads()
     while (slave_list.records > 0)
     {
       struct timespec ts;
-      set_timespec_nsec(ts, 60);
+      set_timespec_nsec(ts, 60000000L);
 
       if (global_system_variables.log_warnings > 1)
         server_threads.iterate(dump_thread_report_status);
@@ -1808,7 +1796,7 @@ static void close_connections(void)
     This will give the threads some time to gracefully abort their
     statements and inform their clients that the server is about to die.
   */
-  server_threads.iterate(kill_all_threads);
+  server_threads.iterate(kill_all_threads_but_repl);
 
   Events::deinit();
   slave_prepare_for_shutdown();
@@ -1831,7 +1819,7 @@ static void close_connections(void)
   */
   DBUG_PRINT("info", ("thread_count: %u", uint32_t(thread_count)));
 
-  for (int i= 0; thread_count && i < 1000; i++)  // TODO: MDEV-18450 wait for "external" fixes and then see if thread_count needs slave_list.records subtraction.
+  for (int i= 0; thread_count - slave_list.records > 0 && i < 1000; i++)
     my_sleep(20000);
 
   if (global_system_variables.log_warnings)

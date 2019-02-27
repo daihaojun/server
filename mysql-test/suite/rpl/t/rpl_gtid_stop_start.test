@@ -70,7 +70,7 @@ SHOW BINLOG EVENTS IN 'master-bin.000004' LIMIT 1,1;
 --write_file $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 wait
 EOF
---shutdown_server 30
+--shutdown_server 900
 --source include/wait_until_disconnected.inc
 
 --append_file $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
