@@ -466,6 +466,7 @@ uint protocol_version;
 uint lower_case_table_names;
 ulong tc_heuristic_recover= 0;
 Atomic_counter<uint32_t> thread_count;
+Atomic_counter<uint32_t> binlog_dump_thread_count;
 int32 slave_open_temp_tables;
 ulong thread_created;
 ulong back_log, connect_timeout, concurrency, server_id;
@@ -705,7 +706,7 @@ mysql_mutex_t
   LOCK_delayed_insert, LOCK_delayed_status, LOCK_delayed_create,
   LOCK_crypt,
   LOCK_global_system_variables,
-  LOCK_user_conn, LOCK_slave_list,
+  LOCK_user_conn,
   LOCK_connection_count, LOCK_error_messages, LOCK_slave_background;
 mysql_mutex_t LOCK_stats, LOCK_global_user_client_stats,
               LOCK_global_table_stats, LOCK_global_index_stats;
@@ -2049,9 +2050,6 @@ static void clean_up(bool print_message)
   free_global_index_stats();
   delete_dynamic(&all_options);                 // This should be empty
   free_all_rpl_filters();
-#ifdef HAVE_REPLICATION
-  end_slave_list();
-#endif
   wsrep_thr_deinit();
   my_uuid_end();
   delete type_handler_data;
@@ -4909,9 +4907,6 @@ static int init_server_components()
 #endif
 
   my_uuid_init((ulong) (my_rnd(&sql_rand))*12345,12345);
-#ifdef HAVE_REPLICATION
-  init_slave_list();
-#endif
   wt_init();
 
   /* Setup logs */
@@ -7199,11 +7194,7 @@ static int show_slaves_connected(THD *thd, SHOW_VAR *var, char *buff)
 
   var->type= SHOW_LONGLONG;
   var->value= buff;
-  mysql_mutex_lock(&LOCK_slave_list);
-
-  *((longlong *)buff)= slave_list.records;
-
-  mysql_mutex_unlock(&LOCK_slave_list);
+  *((longlong*) buff)= uint32_t(binlog_dump_thread_count);
   return 0;
 }
 

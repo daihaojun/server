@@ -89,6 +89,7 @@ class user_var_entry;
 struct Trans_binlog_info;
 class rpl_io_thread_info;
 class rpl_sql_thread_info;
+class Slave_info;
 
 enum enum_ha_read_modes { RFIRST, RNEXT, RPREV, RLAST, RKEY, RNEXT_SAME };
 enum enum_duplicates { DUP_ERROR, DUP_REPLACE, DUP_UPDATE };
@@ -4800,6 +4801,11 @@ private:
   }
 
 public:
+  Slave_info *slave_info;
+
+  int register_slave(uchar *packet, size_t packet_length);
+  void unregister_slave();
+
   inline ulong wsrep_binlog_format() const
   {
     return WSREP_BINLOG_FORMAT(variables.binlog_format);
