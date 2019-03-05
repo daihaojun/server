@@ -2127,10 +2127,10 @@ static int init_binlog_sender(binlog_send_info *info,
   linfo->pos= *pos;
 
   // dump thread linfo set is protected to avoid any slow shutdown race
-  mysql_mutex_lock(&LOCK_slave_list);
+  mysql_mutex_lock(&thd->LOCK_thd_data);
   // note: publish that we use file, before we open it
   thd->current_linfo= linfo;
-  mysql_mutex_unlock(&LOCK_slave_list);
+  mysql_mutex_unlock(&thd->LOCK_thd_data);
 
   if (check_start_offset(info, linfo->log_file_name, *pos))
     return 1;

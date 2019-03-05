@@ -39,17 +39,6 @@
 #include <mysql.h>
 
 
-struct Slave_info
-{
-  uint32 server_id;
-  uint32 master_id;
-  char host[HOSTNAME_LENGTH*SYSTEM_CHARSET_MBMAXLEN+1];
-  char user[USERNAME_LENGTH+1];
-  char password[MAX_PASSWORD_LENGTH*SYSTEM_CHARSET_MBMAXLEN+1];
-  uint16 port;
-};
-
-
 ulong rpl_status=RPL_NULL;
 mysql_mutex_t LOCK_rpl_status;
 
@@ -117,7 +106,7 @@ void THD::unregister_slave()
 
 int THD::register_slave(uchar *packet, size_t packet_length)
 {
-  Slave_info *si, *old_si;
+  Slave_info *si;
   uchar *p= packet, *p_end= packet + packet_length;
   const char *errmsg= "Wrong parameters to function register_slave";
 

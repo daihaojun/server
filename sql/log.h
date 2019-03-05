@@ -923,7 +923,7 @@ public:
   mysql_mutex_t* get_binlog_end_pos_lock() { return &LOCK_binlog_end_pos; }
 
   int wait_for_update_binlog_end_pos(THD* thd, struct timespec * timeout);
-
+  int wait_for_update_binlog_no_thd(struct timespec * timeout);
   /*
     Binlog position of end of the binlog.
     Access to this is protected by LOCK_binlog_end_pos
