@@ -611,3 +611,41 @@ FROM t1
 
 DROP TABLE t1,t2,t3,t4;
 
+--echo #
+--echo # MDEV-18339: ASAN heap-buffer-overflow in
+--echo # Item_exists_subselect::is_top_level_item
+--echo #
+
+CREATE TABLE t1 ( pk int PRIMARY KEY , iiiiiiiiiiiii int , col_int1111 int, col_date_nokey date , col_time_key time, col_time_nokey time , col_datetime_key time, col_datetime_nokey time , ccccccccccccccc varchar(1), vvvvvvvvvvvvvvvvv varchar(1)) engine=innodb;
+
+CREATE TABLE t2 ( iiiiiiiiiiiii int , vvvvvvvvvvvvvvvvv varchar(1)) engine=innodb;
+CREATE TABLE t3 ( pk int PRIMARY KEY) engine=innodb;
+CREATE TABLE t4 ( iiiiiiiiiiiii int , vvvvvvvvvvvvvvvvv varchar(1)) engine=innodb;
+
+select * from
+(select distinct
+    (select count(t111111111.`ccccccccccccccc`) from t1 as t111111111
+    where (exists(select distinct t22222222222.`iiiiiiiiiiiii` from t2 as t22222222222 where t22222222222.`vvvvvvvvvvvvvvvvv` < t111111111.`vvvvvvvvvvvvvvvvv`)
+          or t111111111.`ccccccccccccccc` != t111111111.`vvvvvvvvvvvvvvvvv`)
+    ) as field1
+from
+    (select t1_______2.*
+    from (t1 as t1_______1 join t1 as t1_______2
+            on (t1_______2.`vvvvvvvvvvvvvvvvv` = t1_______1.`ccccccccccccccc`
+             and t1_______1.`iiiiiiiiiiiii` !=
+                (select sum(t44444444444.`iiiiiiiiiiiii`)
+                from (t4 as t44444444444 join t3 as t33333333333
+                    on (t33333333333.`pk` = t44444444444.`iiiiiiiiiiiii`))
+                where t44444444444.`vvvvvvvvvvvvvvvvv` > 'x')
+                )
+        )
+    ) as alias1
+straight_join
+    t2 as alias2
+on (alias2.`iiiiiiiiiiiii` = alias1.`iiiiiiiiiiiii`)
+where ((select 9 from dual) is null)
+and alias1.`pk` in (32, 129, 87, 51, 58, 152, 241, 37, 55, 237, 166)
+group by field1 /*        111  
+111111111 */  ) as derived_aaaaa  /* comment11111111111111111111111111 */;
+
+--echo # End of 10.4 tests
